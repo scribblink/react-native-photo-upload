@@ -35,7 +35,9 @@ export default class PhotoUpload extends React.Component {
     maxWidth: this.props.width || 600,
     format: this.props.format || 'JPEG',
     quality: this.props.quality || 100,
-    buttonDisabled: false
+    buttonDisabled: false,
+    originUri: null,
+    thumbUri: null
   }
 
   options = {
@@ -53,7 +55,7 @@ export default class PhotoUpload extends React.Component {
 
     // get image from image picker
     ImagePicker.showImagePicker(this.options, async response => {
-      this.setState({buttonDisabled: false})
+      this.setState({buttonDisabled: false, originUri: response.uri})
 
       let rotation = 0 
       const {originalRotation} = response
@@ -75,7 +77,7 @@ export default class PhotoUpload extends React.Component {
         return
       }
 
-      let { maxHeight, maxWidth, quality, format } = this.state
+      let { maxHeight, maxWidth, quality, format, originUri } = this.state
       
       //Determining rotation param
       if ( originalRotation === 90) { 
@@ -106,12 +108,34 @@ export default class PhotoUpload extends React.Component {
       // convert image back to base64 string
       const photoData = await RNFS.readFile(filePath, 'base64')
       let source = { uri: resizedImageUri.uri }
-      this.setState({
-        avatarSource: source
-      })
+      
 
+      const filename = originUri.split('\\').pop().split('/').pop();
+      let isFileSmall = true;
+      let destPath = '';
+        try {
+          let filePath = RNFS.DocumentDirectoryPath + '/kueProfile/';
+          await RNFS.mkdir(filePath)
+          destPath = `${filePath}${filename}`;
+          RNFS.moveFile(originUri, destPath)
+          const stats = await RNFS.stat(destPath)
+          if (stats.size < 5000000) {
+            console.log('destPath: ', destPath, stats);
+            
+            this.setState({
+              avatarSource: source
+            })
+          } else {
+            isFileSmall = false;
+            console.log('file size too large');
+          }
+          
+          
+        } catch (e) {
+          console.log('render e: ', e)
+        }	
       // handle photo in props functions as data string
-      if (this.props.onPhotoSelect) this.props.onPhotoSelect(photoData)
+      if (this.props.onPhotoSelect) this.props.onPhotoSelect({originUri:destPath, isFileSmall})
     })
   }
 
